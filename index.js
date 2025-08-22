@@ -15,14 +15,70 @@ const del_popup = document.querySelector(".del-popup");
 const cancel_button = document.querySelector(".cancel-button");
 const details = document.querySelector(".details");
 const title = document.querySelector(".title");
+const des = document.querySelector(".des");
 const cancel = document.querySelector(".cancel");
-// console.log(myArr);
+
+let my_item;
+
 let myArr = [];
 
-myArr = JSON.parse(localStorage.getItem("tasks"));
-console.log(myArr);
+// myArr = JSON.parse(localStorage.getItem("tasks"));
+
 let id_counter = 0;
 id_counter = localStorage.getItem("counter")
+
+const dbWrapperPatch = (resourceId, updateData) => {
+    return new Promise((resolve, reject) => {
+        resolve(fetch(`http://localhost:3000/toDoData/${resourceId}`, {
+            method: 'PATCH',
+
+            body: JSON.stringify(updateData)
+        }))
+    });
+}
+
+
+const dbWrapperPost = (title, description) => {
+    return new Promise((resolve, reject) => {
+        resolve(fetch("http://localhost:3000/toDoData", {
+            method: "POST",
+            body: JSON.stringify({
+                title: `${title}`,
+                description: `${description}`
+            }),
+        }))
+    })
+}
+
+const dbWrapperDelete = (resourceId) => {
+    return new Promise((resolve, reject) => {
+        resolve(fetch(`http://localhost:3000/toDoData/${resourceId}`, {
+            method: 'DELETE',
+        }))
+    });
+}
+
+
+const dbWrapperGet = () => {
+    return new Promise((resolve, reject) => {
+        resolve(fetch("http://localhost:3000/toDoData", {
+            method: "GET"
+        }))
+    })
+}
+
+// crud rest full api and rest api
+
+dbWrapperGet().then((response) => {
+        return response.json();
+    }).then((data) => {
+        console.log(data);
+        myArr = data;
+        updateTask();
+    })
+    .catch((error) => {
+        console.log(error);
+    })
 
 const update = (item) => {
     edit.style.visibility = 'visible';
@@ -30,36 +86,16 @@ const update = (item) => {
 
     update_description.value = item.description;
     if (update_description.value === "") {
-        update_description.value = "No Description Availible"
+        update_description.placeholder = "No Description Availible"
     }
 
-    update_button.addEventListener("click", (event) => {
-        if (update_text.value === "") {
-            update_text.value = "";
-            edit.style.visibility = 'hidden';
-            return;
-        }
-        let new_val = update_text.value;
-        const index = myArr.indexOf(item);
-        myArr[index] = new_val;
-        updateTask();
-        update_text.value = "";
-        update_description.value = ""
-        edit.style.visibility = 'hidden';
-    });
+    my_item = item;
+
 }
 const delItem = (item) => {
     del_popup.style.visibility = "visible";
-    del_button.addEventListener("click", (event) => {
-        const index = myArr.indexOf(item);
-        console.log(index);
-        if (index > -1) {
-            myArr.splice(index, 1);
-            updateTask();
-        }
-        del_popup.style.visibility = "hidden";
-    });
 
+    my_item = item;
 }
 
 const updateTask = () => {
@@ -85,7 +121,12 @@ const updateTask = () => {
         paragraph.classList.add("text-name");
         paragraph.textContent = `${counter}. ${item.title}`;
         paragraph.addEventListener("click", function() {
-            title.textContent = item.title;
+            title.textContent = "Title : " + item.title;
+            if (item.description == "") {
+                des.textContent = "Description : Not Availible";
+            } else {
+                des.textContent = "Description : " + item.description;
+            }
             details.style.visibility = 'visible';
         });
 
@@ -103,7 +144,6 @@ const updateTask = () => {
         delText.classList.add("del-update");
         delText.src = "./src/assets/del.svg"
         delText.addEventListener("click", function() {
-            console.log(item);
             delItem(item);
 
         });
@@ -121,26 +161,41 @@ const updateTask = () => {
     search_bar.value = "";
     description.value = "";
 
-    localStorage.setItem("tasks", JSON.stringify(myArr));
+    // localStorage.setItem("tasks", JSON.stringify(myArr));
 }
 
-updateTask();
+
 
 save_button.addEventListener("click", () => {
+    let mytitle = search_bar.value;
+    let myDes = description.value;
+
     id_counter++;
     if (search_bar.value === "") {
         return;
     }
-    const obj = {
-        id: id_counter
+    if (search_bar.value.length < 3) {
+        alert("enter at least 3 alphabet in task title");
+        return;
     }
-    obj.title = search_bar.value;
-    obj.description = description.value;
-    // myObject.age = 30;
 
-    myArr.unshift(obj);
-    updateTask();
-    localStorage.setItem("counter", id_counter);
+    dbWrapperPost(mytitle, myDes).then(() => {
+            dbWrapperGet().then((response) => {
+                    return response.json();
+                }).then((data) => {
+                    console.log(data);
+                    myArr = data;
+                    updateTask();
+                })
+                .catch((error) => {
+                    console.log(error);
+                })
+        })
+        .catch((error) => {
+            console.log(error);
+        })
+
+    // localStorage.setItem("counter", id_counter);
 });
 
 clear_button.addEventListener("click", (event) => {
@@ -158,4 +213,63 @@ cancel.addEventListener("click", (event) => {
 });
 cancel_button.addEventListener("click", (event) => {
     del_popup.style.visibility = "hidden"
+});
+
+del_button.addEventListener("click", (event) => {
+    dbWrapperDelete(my_item.id).then(() => {
+        console.log("deleted");
+        dbWrapperGet().then((response) => {
+                return response.json();
+            }).then((data) => {
+                console.log(data);
+                myArr = data;
+                updateTask();
+            })
+            .catch((error) => {
+                console.log(error);
+            })
+
+    })
+
+    updateTask();
+    del_popup.style.visibility = "hidden";
+    my_item = null;
+});
+
+update_button.addEventListener("click", (event) => {
+
+
+    console.log(my_item);
+    if (update_text.value === "") {
+        update_text.value = "";
+        update_description.value = "";
+        edit.style.visibility = 'hidden';
+        return;
+    }
+    let new_val = update_text.value;
+    let new_des = update_description.value;
+
+    const updateData = {
+        title: `${new_val}`,
+        description: `${ new_des}`
+    }
+    dbWrapperPatch(my_item.id, updateData).then(() => {
+        console.log("updated");
+        dbWrapperGet().then((response) => {
+                return response.json();
+            }).then((data) => {
+                console.log(data);
+                myArr = data;
+                updateTask();
+            })
+            .catch((error) => {
+                console.log(error);
+            })
+    })
+
+
+    update_text.value = "";
+    update_description.value = ""
+    edit.style.visibility = 'hidden';
+    my_item = null;
 });
